@@ -249,36 +249,79 @@ export async function listMine(
     | string
     | undefined;
 
+  let organizationId:
+    | string
+    | undefined =
+      getOrganizationId(req);
+
   if (
     req.user.role ===
       UserRole.PLATFORM_ADMIN ||
     req.user.role ===
       UserRole.ORGANIZATION_ADMIN
   ) {
+    /*
+     * Administrators may optionally narrow the
+     * listing to a single candidate. When they
+     * don't, they get every self-assessment in
+     * the organization they are scoped to.
+     */
     if (
       typeof req.query.candidateId ===
-      "string"
+      "string" &&
+      req.query.candidateId.trim() !== ""
     ) {
       candidateId =
-        req.query.candidateId;
+        req.query.candidateId.trim();
+    }
+
+    /*
+     * A PLATFORM_ADMIN has no organizationId of
+     * their own, so they must name the tenant they
+     * are inspecting via ?organizationId=...
+     */
+    if (
+      req.user.role ===
+        UserRole.PLATFORM_ADMIN &&
+      typeof req.query.organizationId ===
+        "string" &&
+      req.query.organizationId.trim() !== ""
+    ) {
+      organizationId =
+        req.query.organizationId.trim();
+    }
+
+    if (
+      !candidateId &&
+      !organizationId
+    ) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Provide candidateId or organizationId to list self-assessments",
+      });
+      return;
     }
   } else if (
     req.user.role === UserRole.STAFF
   ) {
     candidateId =
       req.user.userId;
-  }
-
-  if (!candidateId) {
-    res.status(400).json({
+  } else {
+    /*
+     * Managers review their team through the
+     * corroboration workflow, not this endpoint.
+     */
+    res.status(403).json({
       success: false,
       message:
-        "candidateId is required for administrative access",
+        "Use the corroboration queue to review your team's self-assessments",
     });
     return;
   }
 
   if (
+    candidateId &&
     !canAccessCandidateAssessment(
       req,
       candidateId,
@@ -295,8 +338,7 @@ export async function listMine(
   const assessments =
     await listCandidateSelfAssessments({
       candidateId,
-      organizationId:
-        getOrganizationId(req),
+      organizationId,
     });
 
   res.json({

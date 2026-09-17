@@ -312,7 +312,15 @@ export default function App() {
         <Route
           path="/role-profiles"
           element={
-            <RoleProfilesPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "MANAGER",
+                "STAFF",
+              ]}
+            >
+              <RoleProfilesPage />
+            </Guard>
           }
         />
 
@@ -321,7 +329,6 @@ export default function App() {
           element={
             <Guard
               roles={[
-                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -333,7 +340,15 @@ export default function App() {
         <Route
           path="/role-profiles/:id"
           element={
-            <RoleProfileDetailPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "MANAGER",
+                "STAFF",
+              ]}
+            >
+              <RoleProfileDetailPage />
+            </Guard>
           }
         />
 
@@ -342,7 +357,6 @@ export default function App() {
           element={
             <Guard
               roles={[
-                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -358,7 +372,15 @@ export default function App() {
         <Route
           path="/career-paths"
           element={
-            <CareerPathsPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "MANAGER",
+                "STAFF",
+              ]}
+            >
+              <CareerPathsPage />
+            </Guard>
           }
         />
 
@@ -367,7 +389,6 @@ export default function App() {
           element={
             <Guard
               roles={[
-                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -379,7 +400,15 @@ export default function App() {
         <Route
           path="/career-paths/:id"
           element={
-            <CareerPathDetailPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "MANAGER",
+                "STAFF",
+              ]}
+            >
+              <CareerPathDetailPage />
+            </Guard>
           }
         />
 
@@ -388,7 +417,6 @@ export default function App() {
           element={
             <Guard
               roles={[
-                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -404,7 +432,14 @@ export default function App() {
         <Route
           path="/self-assessments"
           element={
-            <SelfAssessmentsPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "STAFF",
+              ]}
+            >
+              <SelfAssessmentsPage />
+            </Guard>
           }
         />
 
@@ -422,7 +457,14 @@ export default function App() {
         <Route
           path="/self-assessments/:id"
           element={
-            <SelfAssessmentDetailPage />
+            <Guard
+              roles={[
+                "ORGANIZATION_ADMIN",
+                "STAFF",
+              ]}
+            >
+              <SelfAssessmentDetailPage />
+            </Guard>
           }
         />
 

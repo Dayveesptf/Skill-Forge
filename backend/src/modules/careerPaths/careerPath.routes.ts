@@ -5,6 +5,7 @@ import {
 import {
   authenticate,
   authorize,
+  requireOrganization,
 } from "../../middleware/auth";
 
 import {
@@ -23,6 +24,15 @@ import {
 const router = Router();
 
 router.use(authenticate);
+
+/*
+ * Career paths are organization-scoped data.
+ *
+ * A PLATFORM_ADMIN has no organizationId, so without this
+ * guard the controller would throw a raw Error and surface
+ * as a 500. requireOrganization turns that into a clean 400.
+ */
+router.use(requireOrganization);
 
 /*
  * All authenticated organization users can

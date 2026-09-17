@@ -72,6 +72,7 @@ const workspaceNavigation: NavigationItem[] = [
     label: "Assessments",
     path: "/assessments",
     icon: ClipboardCheck,
+    roles: ["ORGANIZATION_ADMIN", "MANAGER", "STAFF"],
   },
   {
     label: "My Team",
@@ -85,20 +86,29 @@ const workspaceNavigation: NavigationItem[] = [
     icon: UserRoundCheck,
     roles: ["MANAGER"],
   },
+  /*
+   * Role profiles, career paths and self-assessments are all
+   * organization-scoped. PLATFORM_ADMIN has no organizationId,
+   * so these must not be offered to that role - the API will
+   * reject the request.
+   */
   {
     label: "Role Profiles",
     path: "/role-profiles",
     icon: Target,
+    roles: ["ORGANIZATION_ADMIN", "MANAGER", "STAFF"],
   },
   {
     label: "Career Paths",
     path: "/career-paths",
     icon: Network,
+    roles: ["ORGANIZATION_ADMIN", "MANAGER", "STAFF"],
   },
   {
     label: "Self Assessments",
     path: "/self-assessments",
     icon: UserRoundCheck,
+    roles: ["ORGANIZATION_ADMIN", "STAFF"],
   },
   {
     label: "Reports & Gaps",
@@ -110,6 +120,7 @@ const workspaceNavigation: NavigationItem[] = [
     label: "Learning Resources",
     path: "/learning-resources",
     icon: BookOpen,
+    roles: ["ORGANIZATION_ADMIN", "MANAGER", "STAFF"],
   },
 ];
 
@@ -140,16 +151,19 @@ const administrationNavigation: NavigationItem[] = [
     label: "Analytics",
     path: "/admin/analytics",
     icon: BarChart3,
+    roles: ["PLATFORM_ADMIN", "ORGANIZATION_ADMIN"],
   },
   {
     label: "AI Review",
     path: "/admin/ai-review",
     icon: BrainCircuit,
+    roles: ["ORGANIZATION_ADMIN"],
   },
   {
     label: "Audit Logs",
     path: "/admin/audit",
     icon: ShieldCheck,
+    roles: ["PLATFORM_ADMIN", "ORGANIZATION_ADMIN"],
   },
   { label: "Framework", path: "/admin/framework", icon: Layers3, roles: ["PLATFORM_ADMIN", "ORGANIZATION_ADMIN"] },
   { label: "Skill Library", path: "/admin/organization/skills", icon: Target, roles: ["ORGANIZATION_ADMIN"] },

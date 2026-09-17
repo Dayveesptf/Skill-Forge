@@ -785,20 +785,28 @@ export async function submitSelfAssessment(
 
 export async function listCandidateSelfAssessments(
   params: {
-    candidateId: string;
+    candidateId?: string;
     organizationId?: string;
   }
 ) {
+  /*
+   * candidateId is optional so administrators can list every
+   * self-assessment in their organization. At least one of
+   * candidateId / organizationId must be supplied by the caller;
+   * the controller enforces that.
+   */
   const query: Record<
     string,
     unknown
-  > = {
-    candidateId:
+  > = {};
+
+  if (params.candidateId) {
+    query.candidateId =
       ensureObjectId(
         params.candidateId,
         "candidateId"
-      )
-  };
+      );
+  }
 
   const orgId =
     normalizeOrganizationId(
@@ -815,6 +823,10 @@ export async function listCandidateSelfAssessments(
     .populate(
       "roleProfileId",
       "name slug department status"
+    )
+    .populate(
+      "candidateId",
+      "firstName lastName email jobTitle department"
     )
     .sort({
       createdAt: -1
