@@ -1,129 +1,292 @@
 # SkillForge
 
-SkillForge is a multi-tenant, role-based skills assessment platform: organizations run self-assessment campaigns against a versioned skills framework, managers corroborate what staff report, a scoring engine turns that into per-skill scores, and gap analysis compares people against role targets so gaps can be closed with recommended learning resources.
+SkillForge is a multi-tenant, role-based skills assessment platform.
 
-This README covers two things:
+The idea is simple: an organization can create assessment campaigns using a specific version of its skills framework, staff can assess themselves, managers can review what their team members submitted, and the system uses the results to show skill gaps and suggest learning resources.
 
-1. **What has actually been built**, mapped against the original architecture/spec document, so it's clear what's implemented vs. what was scoped but deferred.
-2. **Optional provider configuration** — how the app degrades gracefully when third-party keys (Stripe, Resend, etc.) aren't set, for local/demo use.
+This README is mainly here to explain what is currently in the project and what still depends on external services.
+
+## 1. What is currently built
+
+### Backend
+
+The backend is an Express + TypeScript application using MongoDB. The code is split into modules based on the different parts of the platform.
+
+Some of the main models currently in the project are:
+
+- Organization
+- User
+- FrameworkVersion
+- Skill
+- SkillLevel
+- BehaviouralFactor
+- RoleProfile
+- CareerPath
+- SelfAssessmentCampaign
+- SelfAssessment
+- SelfAssessmentResponse
+- AssessmentAssignment
+- AssessmentAttempt
+- EvidencePrompt
+- ManagerCorroboration
+- AssessmentScore
+- GapAnalysis
+- LearningResource
+- Notification
+- AuditLog
+- Invitation
+- IndustryTemplate
+
+The project is multi-tenant, so organization data is kept separate using `organizationId`. User roles are also used to control what each person can access.
+
+The current roles are:
+
+- `PLATFORM_ADMIN`
+- `ORGANIZATION_ADMIN`
+- `MANAGER`
+- `STAFF`
+
+Authentication and authorization are handled through the existing auth middleware, instead of checking roles manually in every controller.
+
+### Frameworks and assessments
+
+Framework versions are stored separately from the skills that belong to them. This allows an assessment campaign to stay connected to the exact framework version it was created with.
+
+The main assessment flow currently follows this structure:
+
+```text
+Campaign
+   ↓
+Assignment
+   ↓
+Self Assessment
+   ↓
+Evidence
+   ↓
+Manager Corroboration
+   ↓
+Scoring
+   ↓
+Gap Analysis
+```
+
+Each part has its own module with the relevant models, services, controllers and routes.
+
+### Evidence uploads
+
+Evidence files are handled using presigned upload URLs.
+
+The frontend gets a temporary upload URL from the backend and uploads the file directly to S3 or another compatible storage provider. The actual file is not stored inside MongoDB. MongoDB only keeps the information needed to reference the uploaded file.
+
+The storage setup can work with S3-compatible providers such as AWS S3, Cloudflare R2, Backblaze B2 or MinIO.
+
+### Redis
+
+Redis is supported as an optional cache.
+
+If `REDIS_URL` is not provided, the application can continue running without Redis. The cache layer simply does not perform the Redis operations.
+
+### Audit logs and impersonation
+
+The project has audit logging for important actions, along with support for platform administrators to impersonate an organization when that functionality is required.
+
+The impersonation flow has its own `ImpersonationSession` model and keeps an audit trail.
+
+### Reports
+
+Reports and analytics are already part of the backend.
+
+There are endpoints for candidate reports, organization analytics and report exports. Scheduled report functionality is also present, although sending those reports by email depends on the email provider being configured.
+
+### Other features
+
+A few features were added after the original MVP requirements and are already present in the codebase:
+
+- AI features using Gemini
+- Bulk user import
+- Invitations
+- Stripe billing and subscriptions
+- Support tickets
+- SSO
+- MFA
+- HRIS/LMS integration support
+
+These are in the project as actual modules rather than just placeholders.
 
 ---
 
-## 1. What's built, against the spec
+## 2. Frontend
 
-The original spec called for a modular monolith — React/TypeScript frontend talking to an Express/TypeScript backend, MongoDB as the primary store, with Redis, object storage and email layered in as "optional/recommended." That's the shape the codebase follows.
+The frontend is built with React, TypeScript, Vite and Tailwind CSS.
 
-### Backend (`/backend`)
+TanStack Query is used for server state, Axios handles API requests, and Recharts is used for some of the analytics screens.
 
-Organized as a modules-per-domain monolith under `src/modules/`, matching the spec's proposed structure almost one-to-one:
+The main frontend areas include:
 
-- **Core domain models** (`src/models/`): `Organization`, `User`, `FrameworkVersion`, `Skill`, `SkillLevel`, `BehaviouralFactor`, `RoleProfile`, `CareerPath`, `SelfAssessmentCampaign`, `SelfAssessment` / `SelfAssessmentResponse`, `AssessmentAssignment`, `AssessmentAttempt`, `EvidencePrompt`, `ManagerCorroboration`, `AssessmentScore`, `GapAnalysis`, `LearningResource`, `Notification`, `AuditLog`, `Invitation`, `IndustryTemplate`. This lines up with the ~20 "core entities" called out in the spec (Tenant → here named `Organization`, User, Framework/Version, Skill, RoleProfile, CareerPath, Campaign, Assessment, Evidence, Corroboration, Score, GapAnalysis, LearningResource, Notification, AuditLog).
-- **Multi-tenancy**: every organization-scoped model carries `organizationId`, and `User.role` + `organizationId` drive access — the tenant-isolation pattern the spec called "critical for security."
-- **RBAC**: `PLATFORM_ADMIN`, `ORGANIZATION_ADMIN`, `MANAGER`, `STAFF` (`src/constants/roles.ts`), enforced via `authenticate` / `authorize` / `requireOrganization` middleware rather than scattered `if (role === "ADMIN")` checks.
-- **Auth**: JWT access tokens plus SSO (OIDC/SAML) support (`modules/auth/sso.*`), and MFA/TOTP models (`MfaCredential` in `modules/infrastructure`).
-- **Framework versioning**: `FrameworkVersion` is a separate, versioned document from `Skill`/`SkillLevel`, so a campaign and its assessments stay pinned to the version they were scored against — the spec flagged this as one of the most important database decisions, and it's implemented as designed.
-- **Assessment workflow**: `selfAssessmentCampaigns` → `AssessmentAssignment` → `SelfAssessment`/`AssessmentAttempt` → `Evidence` → `ManagerCorroboration` → `scoring` → `gapAnalysis`, each as its own module with controller/service/routes, matching the spec's phase breakdown (Phases 5–7).
-- **Evidence storage**: `config/storage.ts` wraps AWS S3 / any S3-compatible provider (R2, B2, MinIO). Files never transit the API server — the client requests a presigned PUT URL, uploads directly, then the backend confirms and stores only metadata, exactly per the spec's "don't store binaries in MongoDB" recommendation. Reads use short-lived presigned GET URLs.
-- **Caching**: `config/redis.ts` is a cache-aside layer over `ioredis` that's fully optional — with no `REDIS_URL` set it transparently no-ops rather than failing, matching the spec's "not required for MVP but architect for it" guidance.
-- **Audit logging & impersonation**: `AuditLog` model plus an `ImpersonationSession` model and controller (`modules/infrastructure`), covering the platform-admin "impersonate a tenant with full audit logging" use case called out in the spec.
-- **Reporting**: `modules/reports` and `modules/infrastructure/report-export.service.ts` generate exportable reports; scheduled report delivery and email are wired up but provider-gated (see section 2).
-- **Extras beyond the original spec**: an AI module (`modules/ai`) using Google's Gemini SDK, user import/bulk invitations (`modules/imports`, `modules/invitations`), Stripe billing/subscriptions, and support tickets — these weren't in the original architecture doc but have been added as the platform grew past the MVP scope.
+### Admin
 
-### Frontend (`/frontend`)
+The admin section currently contains pages for things such as:
 
-React + TypeScript + Tailwind, with TanStack Query for server state and Recharts for analytics, as specified. Pages are organized by role, mirroring the spec's route plan (`/platform`, `/org`, `/manager`, `/staff` conceptually, though the actual route names differ slightly):
+- Organization management
+- Users
+- Skills
+- Invitations
+- Analytics
+- Audit logs
+- Framework management
+- Framework migration
+- Billing
+- Integrations
+- Scheduled reports
 
-- `pages/admin/` — organization structure, skill library, invitations, users, analytics, audit log, framework migration, billing, integrations, scheduled reports, platform-level organization management.
-- `pages/manager/` — team view and corroboration queue/detail.
-- `pages/self-assessments/` — the staff-facing assessment list, detail, and "new assessment" flow.
-- `pages/career-paths/`, `pages/roles/`, `pages/learning/`, `pages/reports/`, `pages/notifications/`, `pages/ai/` — supporting feature areas from the spec (career paths, role profiles, learning resources, reporting, notifications) plus the AI extension.
-- Shared components: a `DataTable`, an `EvidenceUploader` (pairs with the presigned-upload backend flow), and a `ConfigurationNotice` component that renders the "not configured yet" banners referenced in section 2.
+### Manager
 
-**Deviation from the original spec**: the spec recommended React Hook Form + Zod for all the form-heavy flows (org setup, campaigns, assessments, evidence, corroboration). The frontend currently only depends on `@tanstack/react-query`, `axios`, `lucide-react`, `react-router-dom`, and `recharts` — form validation is handled without that library pairing, so forms are more manually wired than the spec envisioned.
+Managers have access to:
 
-### Where this sits against the phased plan
+- Their team
+- Corroboration requests
+- Team member reports
+- Related assessment information
 
-Phases 1–7 from the spec (foundation, framework, org setup, role profiles, assessments, manager corroboration, scoring + gap analysis) all have corresponding modules on both sides of the stack. Phase 8 (reports + analytics) is present but partially provider-gated — report generation code and the scheduling UI exist, but actually emailing a scheduled report needs `RESEND_API_KEY` (see below). Billing/subscriptions, SSO, MFA, HRIS/LMS integrations and audited impersonation — called "already implemented" ahead of provider configuration — are all present as real controllers/services/models, not stubs; they just have no live credentials in this environment.
+Managers are restricted to the staff members assigned to them.
+
+### Staff
+
+Staff can access:
+
+- Self assessments
+- Assessment details
+- Their reports
+- Gap analysis
+- Learning resources
+- Career paths
+- Notifications
+
+### Other feature areas
+
+There are also frontend pages for:
+
+- Role profiles
+- Career paths
+- Learning resources
+- Reports
+- Notifications
+- AI features
+
+There are shared components for things like tables, evidence uploads and configuration notices.
 
 ---
 
-## 2. Optional provider configuration
+## 3. What was different from the original plan
 
-This patch makes the external infrastructure integrations **gracefully optional** for local/demo testing.
+The original architecture suggested using React Hook Form and Zod together for the form-heavy parts of the frontend.
 
-### What happens when the provider keys are missing?
+The current frontend does not use that combination. The forms are handled with the existing React/TypeScript setup and manual validation instead.
 
-The SkillForge application does **not** require the following values in order to run the core platform:
+This does not stop the application from working; it is just different from what was originally suggested in the architecture document.
+
+---
+
+## 4. Where the project currently stands
+
+The main phases from the original plan have corresponding implementations in the project:
+
+```text
+Foundation
+    ↓
+Frameworks
+    ↓
+Organization setup
+    ↓
+Role profiles
+    ↓
+Assessments
+    ↓
+Manager corroboration
+    ↓
+Scoring
+    ↓
+Gap analysis
+    ↓
+Reports and analytics
+```
+
+The core platform is therefore already in place.
+
+There are also additional modules around billing, authentication, integrations, AI and administration.
+
+Some of these features depend on external services, which is why they may not be fully usable in a local/demo environment until their provider keys are added.
+
+---
+
+# Optional provider configuration
+
+The external services are set up so that the main application can still be tested without configuring every provider.
+
+The following environment variables can be left empty for a basic local/demo setup:
 
 ```env
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+
 RESEND_API_KEY=
 REPORT_FROM_EMAIL=reports@yourdomain.com
+
 APP_ENCRYPTION_KEY=
+
 VITE_STRIPE_PRICE_ID=
 ```
 
-#### Stripe
+## Stripe
 
-If `STRIPE_SECRET_KEY` or `VITE_STRIPE_PRICE_ID` is missing:
+Without `STRIPE_SECRET_KEY` or `VITE_STRIPE_PRICE_ID`, the billing section can still be opened and subscription information can be viewed.
 
-- Billing still opens normally.
-- The subscription status can still be viewed.
-- Live checkout is disabled.
-- Clicking a billing action displays a **"Stripe is not configured yet"** popup instead of throwing an application error.
-- The Stripe controllers and services remain installed and ready for configuration later.
+Live Stripe checkout will not work until the required Stripe values are configured.
 
-#### Resend / scheduled reports
+Instead of the application crashing, the billing action shows a message telling the user that Stripe has not been configured yet.
 
-If `RESEND_API_KEY` is missing:
+The Stripe controllers, services and routes are already in the project, so the provider can be connected later.
 
-- The scheduled-report page still loads.
-- PDF/XLSX report generation code remains installed.
-- The automation worker remains installed.
-- Email scheduling is disabled in the UI.
-- The user sees a **"Report email delivery is not configured yet"** popup instead of an error.
+## Resend and scheduled reports
 
-#### APP_ENCRYPTION_KEY
+Without `RESEND_API_KEY`, the scheduled reports section can still be opened.
 
-`APP_ENCRYPTION_KEY` is optional for the current demo environment. The existing secret-encryption utility falls back to the JWT access secret when the application encryption key is not provided, so the server does not fail to start merely because this value is blank.
+The report generation functionality is still there, including PDF/XLSX generation and the automation worker.
 
-For production, configure a dedicated `APP_ENCRYPTION_KEY`.
+What is disabled is the actual email delivery.
 
-### Important: the integrations are already implemented
+The UI displays a message that report email delivery has not been configured yet rather than treating it as a server error.
 
-The provider integrations have already been added to the SkillForge codebase. This includes controllers, services, routes and UI for:
+## APP_ENCRYPTION_KEY
 
-- Stripe billing/subscriptions
-- Stripe webhooks
-- Resend report delivery
-- Scheduled PDF/XLSX reports
-- Secret encryption
-- SSO/OIDC/SAML
-- MFA/TOTP
-- HRIS/LMS integrations
-- Support tickets and audited impersonation
+`APP_ENCRYPTION_KEY` is optional in the current demo setup.
 
-The current demo environment simply does **not have the external provider API keys configured yet**.
+The existing encryption utility can fall back to the JWT access secret when a separate application encryption key has not been provided.
 
-This is intentional so the core SkillForge platform can be tested without creating external Stripe, Resend or other provider accounts first.
+For a production deployment, a separate `APP_ENCRYPTION_KEY` should be configured.
 
-### Provider configuration later
+---
 
-When credentials become available, add them to the appropriate `.env` files:
+## Provider setup later
+
+When the required provider accounts and credentials are available, the backend can be configured with:
 
 ```env
 STRIPE_SECRET_KEY=...
 STRIPE_WEBHOOK_SECRET=...
+
 RESEND_API_KEY=...
 REPORT_FROM_EMAIL=reports@yourdomain.com
+
 APP_ENCRYPTION_KEY=...
 ```
 
-and the frontend:
+The frontend can use:
 
 ```env
 VITE_STRIPE_PRICE_ID=...
 ```
 
-Restart both frontend and backend after changing environment variables.
+After changing environment variables, restart the frontend and backend so the new values are picked up.
+
+For now, the provider-dependent parts can remain unconfigured while the main SkillForge features are being tested.
