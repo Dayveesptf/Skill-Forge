@@ -14,7 +14,7 @@ import { env } from "../../config/env";
 const cookieOptions = {
   httpOnly: true,
   secure: env.nodeEnv === "production",
-  sameSite: "lax" as const,
+  sameSite: (env.nodeEnv === "production" ? "none" : "lax") as const,
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: "/api/auth",
 };
