@@ -14,11 +14,6 @@ import {
   updateRoleProfileHandler,
   publishRoleProfileHandler,
   archiveRoleProfileHandler,
-  createCareerPathHandler,
-  getCareerPaths,
-  getCareerPathHandler,
-  updateCareerPathHandler,
-  deleteCareerPathHandler,
 } from "./roleProfile.controller";
 
 const router = Router();
@@ -43,49 +38,14 @@ router.get(
   getRoleProfiles
 );
 
-/* -------------------------------------------------------------------------- */
-/* Career Paths                                                               */
-/*                                                                            */
-/* These routes MUST appear before "/:id".                                    */
-/* Otherwise "/career-paths" can be interpreted as a role-profile ID.        */
-/* -------------------------------------------------------------------------- */
-
-router.post(
-  "/career-paths",
-  authorize(
-    UserRole.PLATFORM_ADMIN,
-    UserRole.ORGANIZATION_ADMIN
-  ),
-  createCareerPathHandler
-);
-
-router.get(
-  "/career-paths",
-  getCareerPaths
-);
-
-router.get(
-  "/career-paths/:id",
-  getCareerPathHandler
-);
-
-router.patch(
-  "/career-paths/:id",
-  authorize(
-    UserRole.PLATFORM_ADMIN,
-    UserRole.ORGANIZATION_ADMIN
-  ),
-  updateCareerPathHandler
-);
-
-router.delete(
-  "/career-paths/:id",
-  authorize(
-    UserRole.PLATFORM_ADMIN,
-    UserRole.ORGANIZATION_ADMIN
-  ),
-  deleteCareerPathHandler
-);
+/*
+ * Career path management lives entirely under /api/career-paths
+ * (see modules/careerPaths). It used to be duplicated here as well,
+ * writing to the same CareerPath collection through a second set of
+ * routes/controller/service with its own (and different) role rules —
+ * that duplication has been removed. Use /api/career-paths for all
+ * career path reads/writes.
+ */
 
 /* -------------------------------------------------------------------------- */
 /* Role Profiles - Individual                                                 */

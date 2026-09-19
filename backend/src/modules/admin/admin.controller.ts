@@ -9,6 +9,15 @@ import {
 } from "./admin.service";
 import { writeAuditLog } from "../../services/audit.service";
 
+/*
+ * Every route in admin.routes.ts already enforces role membership via
+ * authorize(...) middleware before any of these handlers run — the
+ * isPlatformAdmin() checks below exist only to pick which organizationId
+ * to act on (a platform admin acts on whatever :organizationId is in the
+ * URL; an organization admin always acts on their own), not to gate
+ * access. Access control itself lives in the route file, not here.
+ */
+
 function getRouteParam(
   value: string | string[] | undefined,
   paramName: string
@@ -24,24 +33,11 @@ function isPlatformAdmin(req: AuthenticatedRequest) {
   return req.user?.role === UserRole.PLATFORM_ADMIN;
 }
 
-function isOrganizationAdmin(req: AuthenticatedRequest) {
-  return (
-    req.user?.role === UserRole.ORGANIZATION_ADMIN
-  );
-}
-
 export async function platformOverview(
   req: AuthenticatedRequest,
   res: Response
 ) {
   try {
-    if (!isPlatformAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message: "Platform administrator access required"
-      });
-    }
-
     const data = await getPlatformOverview();
 
     return res.json({
@@ -63,16 +59,6 @@ export async function organizationOverview(
   res: Response
 ) {
   try {
-    if (
-      !isPlatformAdmin(req) &&
-      !isOrganizationAdmin(req)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Administrator access required"
-      });
-    }
-
     const organizationId =
       isPlatformAdmin(req)
         ? getRouteParam(
@@ -116,16 +102,6 @@ export async function listOrganizationUsers(
   res: Response
 ) {
   try {
-    if (
-      !isPlatformAdmin(req) &&
-      !isOrganizationAdmin(req)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Administrator access required"
-      });
-    }
-
     const organizationId =
       isPlatformAdmin(req)
         ? getRouteParam(
@@ -168,16 +144,6 @@ export async function updateUserStatus(
   res: Response
 ) {
   try {
-    if (
-      !isPlatformAdmin(req) &&
-      !isOrganizationAdmin(req)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Administrator access required"
-      });
-    }
-
     const userId = getRouteParam(
       req.params.userId,
       "user id"

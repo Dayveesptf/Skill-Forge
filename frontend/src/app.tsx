@@ -296,7 +296,6 @@ export default function App() {
           element={
             <Guard
               roles={[
-                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -314,6 +313,7 @@ export default function App() {
           element={
             <Guard
               roles={[
+                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
                 "MANAGER",
                 "STAFF",
@@ -329,6 +329,7 @@ export default function App() {
           element={
             <Guard
               roles={[
+                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >
@@ -342,6 +343,7 @@ export default function App() {
           element={
             <Guard
               roles={[
+                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
                 "MANAGER",
                 "STAFF",
@@ -357,6 +359,7 @@ export default function App() {
           element={
             <Guard
               roles={[
+                "PLATFORM_ADMIN",
                 "ORGANIZATION_ADMIN",
               ]}
             >

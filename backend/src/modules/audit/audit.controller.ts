@@ -14,6 +14,12 @@ import {
   AuditValidationError
 } from "./audit.service";
 
+/*
+ * audit.routes.ts already restricts every route here to PLATFORM_ADMIN
+ * or ORGANIZATION_ADMIN via authorize(...) middleware — these handlers
+ * only need to decide the organization scope, not re-check the role.
+ */
+
 function getRouteParam(
   value:
     | string
@@ -31,17 +37,6 @@ function getRouteParam(
   }
 
   return value.trim();
-}
-
-function isAdmin(
-  req: AuthenticatedRequest
-) {
-  return (
-    req.user?.role ===
-      UserRole.PLATFORM_ADMIN ||
-    req.user?.role ===
-      UserRole.ORGANIZATION_ADMIN
-  );
 }
 
 function getOptionalQueryString(
@@ -99,14 +94,6 @@ export async function getAuditLogs(
   res: Response
 ) {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Administrator access required"
-      });
-    }
-
     const organizationId =
       req.user!.role ===
       UserRole.PLATFORM_ADMIN
@@ -184,14 +171,6 @@ export async function getAuditLog(
   res: Response
 ) {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Administrator access required"
-      });
-    }
-
     const id =
       getRouteParam(
         req.params.id,

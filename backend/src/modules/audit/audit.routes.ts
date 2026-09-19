@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { authenticate } from "../../middleware/auth";
+import { authenticate, authorize } from "../../middleware/auth";
+import { UserRole } from "../../constants/roles";
 import {
   getAuditLogs,
   getAuditLog
@@ -8,6 +9,7 @@ import {
 const router = Router();
 
 router.use(authenticate);
+router.use(authorize(UserRole.PLATFORM_ADMIN, UserRole.ORGANIZATION_ADMIN));
 
 router.get("/", getAuditLogs);
 

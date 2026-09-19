@@ -66,7 +66,8 @@ async function getCandidateOrThrow(
     _id: ensureObjectId(
       candidateId,
       "candidateId"
-    )
+    ),
+    role: UserRole.STAFF
   };
 
   const orgId = normalizeOrganizationId(
@@ -81,7 +82,7 @@ async function getCandidateOrThrow(
     await User.findOne(query);
 
   if (!candidate) {
-    throw new Error("Candidate not found");
+    throw new Error("Candidate not found. Assessments can only be assigned to staff accounts.");
   }
 
   return candidate;
